@@ -8,7 +8,7 @@ export default defineConfig({
         cors: false,
         proxy: {
             '/api/pigeomail/v1/stream': {
-                target: 'http://localhost:8080/',
+                target: 'http://localhost:20406/',
                 changeOrigin: true,
                 secure: false,
             },
