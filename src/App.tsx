@@ -1,7 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import './App.css';
-import {EMail, IncomingEmail} from "./api.ts";
-import axios from "axios";
+import {EMail, IncomingEmail} from './api.ts';
+import axios from 'axios';
 
 type TemporaryEmailProps = {
     apiUrl: string; // Backend API URL
@@ -14,13 +14,25 @@ const TemporaryEmail: React.FC<TemporaryEmailProps> = ({apiUrl}) => {
 
     const createMailbox = async () => {
         try {
+            disconnectFromSSE(); // Close SSE connection if it exists
             const response = await axios.post(`${apiUrl}/mailbox`);
-            const data = await response.data as EMail;
+            const data = (await response.data) as EMail;
             setEmailName(data.email);
             localStorage.setItem('emailName', data.email);
             connectToSSE(data.email);
         } catch (error) {
             console.error('Error creating mailbox:', error);
+        }
+    };
+
+    const deleteMailbox = async () => {
+        try {
+            setEmailName(null);
+            setMessages([]);
+            localStorage.removeItem('emailName');
+            disconnectFromSSE();
+        } catch (error) {
+            console.error('Error deleting mailbox:', error);
         }
     };
 
@@ -31,7 +43,7 @@ const TemporaryEmail: React.FC<TemporaryEmailProps> = ({apiUrl}) => {
         eventSourceRef.current = new EventSource(`${apiUrl}/stream?stream=${emailName}`);
         eventSourceRef.current.onmessage = (event) => {
             const newMessage = JSON.parse(event.data) as IncomingEmail;
-            console.log('New message:', newMessage)
+            console.log('New message:', newMessage);
             setMessages((prevMessages) => [...prevMessages, newMessage]);
         };
     };
@@ -52,9 +64,6 @@ const TemporaryEmail: React.FC<TemporaryEmailProps> = ({apiUrl}) => {
         if (savedEmailName != undefined || savedEmailName != null) {
             setEmailName(savedEmailName);
             connectToSSE(savedEmailName); // Start SSE connection if email name is available
-        } else {
-            // If no saved email name, create a new mailbox
-            createMailbox();
         }
 
         // Cleanup SSE connection on component unmount
@@ -62,22 +71,45 @@ const TemporaryEmail: React.FC<TemporaryEmailProps> = ({apiUrl}) => {
     }, []);
 
     return (
-        <div>
+        <div className="temporary-email-container">
             <h2>Temporary Email</h2>
+
+            <div className="action-buttons">
+                <button onClick={createMailbox}>
+                    {emailName ? 'Recreate Email' : 'Create Mailbox'}
+                </button>
+                {emailName && <button onClick={deleteMailbox}>Delete Email</button>}
+            </div>
+
             {emailName && <p>Email Address: {emailName}</p>}
 
             <h3>Incoming Messages</h3>
-            {messages.map((message, index) => (
-                <div key={index}>
-                    <p key={index}>From: {message.from}</p>
-                    <p key={index}>To: {message.to}</p>
-                    <p key={index}>Subject: {message.subject}</p>
-                    <p key={index}>Body: {message.body}</p>
-                </div>
-            ))}
+            {messages.length > 0 ? (
+                <table className="email-table">
+                    <thead>
+                    <tr>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Subject</th>
+                        <th>Body</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {messages.map((message, index) => (
+                        <tr key={index}>
+                            <td>{message.from}</td>
+                            <td>{message.to}</td>
+                            <td>{message.subject}</td>
+                            <td>{message.body}</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            ) : (
+                <p>No messages to display.</p>
+            )}
         </div>
     );
 };
 
 export default TemporaryEmail;
-
